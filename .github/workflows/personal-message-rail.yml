@@ -9,10 +9,13 @@ on:
       platform:
         type: choice
         default: all
-        options: [all, windows]
+        options: [all, windows, macos]
       repository_checks:
         type: boolean
         default: true
+      repository_commands:
+        type: string
+        default: '["lint","typecheck","build"]'
 
 permissions:
   contents: read
@@ -30,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ fromJSON(inputs.platform == 'windows' && '["windows-2025"]' || '["ubuntu-24.04","macos-15","windows-2025"]') }}
+        os: ${{ fromJSON(inputs.platform == 'windows' && '["windows-2025"]' || inputs.platform == 'macos' && '["macos-15"]' || '["ubuntu-24.04","macos-15","windows-2025"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -72,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        command: [lint, typecheck, build]
+        command: ${{ fromJSON(inputs.repository_commands || '["lint","typecheck","build"]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
