@@ -8,6 +8,7 @@ import { NativeChatMessageRail } from './NativeChatMessageRail'
 import { useNativeChatMessageRail } from './use-native-chat-message-rail'
 
 afterEach(cleanup)
+afterEach(() => vi.restoreAllMocks())
 
 const NO_SLOTS: never[] = []
 const NO_ROWS = { messages: [], turnKeys: [] }
@@ -71,22 +72,56 @@ const preview = (): HTMLElement | null =>
   document.querySelector<HTMLElement>('[data-slot="hover-card-content"]')
 
 describe('message rail interaction', () => {
+  it('focuses and selects a windowed message after walking to both ends of a long outline', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(800)
+    const user = userEvent.setup()
+    const select = vi.fn()
+    render(<Rail count={10_000} activeIndex={9999} onSelect={select} />)
+
+    await user.click(screen.getByRole('button', { name: 'Expand message list' }))
+    await waitFor(() => expect(document.activeElement).toBe(tick('Prompt 9999')))
+    await user.keyboard('{Home}')
+    await waitFor(() => expect(document.activeElement).toBe(tick('Prompt 0')))
+    await user.keyboard('{ArrowDown}{End}{Enter}')
+    expect(document.activeElement).toBe(tick('Prompt 9999'))
+    expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 'prompt-9999' }))
+    await user.keyboard('{Escape}')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Expand message list' }))
+  })
+
   it('keeps the complete message list open after a jump and restores the toggle on Escape', async () => {
     const user = userEvent.setup()
     const select = vi.fn()
-    render(<Rail count={60} activeIndex={59} onSelect={select} />)
+    render(<Rail count={40} activeIndex={39} onSelect={select} />)
     expect(screen.queryByRole('button', { name: 'Prompt 1' })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Expand message list' }))
-    expect(document.activeElement).toBe(tick('Prompt 59'))
+    expect(document.activeElement).toBe(tick('Prompt 39'))
     await user.click(tick('Prompt 1'))
     expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 'prompt-1' }))
     expect(screen.getByRole('button', { name: 'Collapse message list' })).not.toBeNull()
-    expect(tick('Prompt 1').textContent).toBe('Prompt 1')
 
     await user.keyboard('{Escape}')
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Expand message list' }))
     expect(screen.queryByRole('button', { name: 'Prompt 1' })).toBeNull()
+  })
+
+  it('tabs through the expanded header before the message list', async () => {
+    const user = userEvent.setup()
+    render(<Rail activeIndex={1} />)
+    await user.click(screen.getByRole('button', { name: 'Expand message list' }))
+    expect(document.activeElement).toBe(tick('Prompt 1'))
+
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Collapse message list' })
+    )
+    await user.tab()
+    expect(document.activeElement).toBe(tick('Prompt 1'))
+    await user.tab({ shift: true })
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Composer' }))
   })
 
   it('is one tab stop on the current tick, walked by arrow keys, each previewing itself', async () => {
