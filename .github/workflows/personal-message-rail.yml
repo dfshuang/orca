@@ -26,7 +26,7 @@ concurrency:
 
 env:
   ORCA_BACKGROUND_LAUNCH: '1'
-  ORCA_CODE_QUALITY_BASE: 8a10dd371c771f23546f025b6315920bf95fd025
+  ORCA_CODE_QUALITY_BASE: b07b3d318a4e1d8bc6ac9268f8a3abc2ae509e3e
 
 jobs:
   verify:
@@ -58,11 +58,47 @@ jobs:
         run: pnpm tc:web
       - uses: ./.github/actions/install-mobile-dependencies
       - name: Changed-code quality against the merged upstream base
-        run: pnpm check:code-quality:changed 8a10dd371c771f23546f025b6315920bf95fd025
+        run: pnpm check:code-quality:changed b07b3d318a4e1d8bc6ac9268f8a3abc2ae509e3e
       - name: Install headless browser
         run: pnpm exec playwright install --with-deps chromium
       - name: Rendered directory navigation and long-history check
         run: node config/scripts/component-fixtures/personal-message-rail.mjs
+      - name: Verify added regressions fail without the feature
+        shell: bash
+        run: |
+          rail=src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.tsx
+          cp "$rail" "$RUNNER_TEMP/feature-rail.tsx"
+          trap 'cp "$RUNNER_TEMP/feature-rail.tsx" "$rail"' EXIT
+          git show "${ORCA_CODE_QUALITY_BASE}:$rail" > "$rail"
+          set +e
+          pnpm test src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.test.tsx src/renderer/src/components/native-chat/viewport/navigation/NativeChatMessageList.rail-history-jump.test.tsx --maxWorkers=2 --testNamePattern='focuses and selects a windowed message|keeps the complete message list open|tabs through the expanded header|pages to an unloaded message from the expanded directory' --reporter=json --outputFile=counterfactual.json
+          result=$?
+          set -e
+          test "$result" -ne 0
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import fs from 'node:fs'
+          const report = JSON.parse(fs.readFileSync('counterfactual.json', 'utf8'))
+          const failed = report.testResults.flatMap((suite) => suite.assertionResults).filter((test) => test.status === 'failed')
+          const expected = [
+            'focuses and selects a windowed message after walking to both ends of a long outline',
+            'keeps the complete message list open after a jump and restores the toggle on Escape',
+            'tabs through the expanded header before the message list',
+            'pages to an unloaded message from the expanded directory and keeps it open at the landing'
+          ]
+          assert.equal(report.numFailedTests, 4)
+          assert.equal(report.numPassedTests, 0)
+          assert.equal(report.numRuntimeErrorTestSuites ?? 0, 0)
+          assert.deepEqual(failed.map((test) => test.title).sort(), expected.sort())
+          for (const test of failed) {
+            const failure = test.failureMessages.join('\n')
+            assert.match(failure, /Unable to find an accessible element/)
+            assert.match(failure, /Expand message list/)
+          }
+          const evidence = { result: 'passed', baseline: process.env.ORCA_CODE_QUALITY_BASE, failingRegressions: expected, reason: 'The unmodified upstream rail has no expand control' }
+          fs.writeFileSync('message-rail-proof/counterfactual-verification.json', JSON.stringify(evidence, null, 2) + '\n')
+          console.log(JSON.stringify(evidence, null, 2))
+          NODE
       - uses: actions/upload-artifact@v7
         if: always()
         with:
