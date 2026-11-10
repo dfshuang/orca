@@ -95,7 +95,7 @@ try {
     }
   }
   assert.deepEqual(errors, [])
-  await writeFile(`${output}/verification.json`, JSON.stringify(results, null, 2) + '\n')
+  await writeFile(`${output}/verification.json`, `${JSON.stringify(results, null, 2)}\n`)
   console.log(JSON.stringify(results, null, 2))
 } finally {
   await browser.close()
