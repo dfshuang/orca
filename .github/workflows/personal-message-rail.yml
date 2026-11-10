@@ -14,10 +14,15 @@ concurrency:
 
 env:
   ORCA_BACKGROUND_LAUNCH: '1'
+  ORCA_CODE_QUALITY_BASE: 8a10dd371c771f23546f025b6315920bf95fd025
 
 jobs:
   verify:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
@@ -33,7 +38,7 @@ jobs:
           pnpm exec oxlint src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.test.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.fixture.tsx
           pnpm exec oxfmt --check src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.test.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.fixture.tsx src/renderer/src/i18n/locales/en.json src/renderer/src/i18n/locales/zh.json docs/site/content/docs/agents/native-chat.mdx
       - name: Message rail tests
-        run: pnpm test src/renderer/src/components/native-chat/viewport/rail src/renderer/src/components/virtualized-list.test.tsx --maxWorkers=2
+        run: pnpm test src/renderer/src/components/native-chat/viewport/rail src/renderer/src/components/native-chat/viewport/navigation src/renderer/src/components/virtualized-list.test.tsx --maxWorkers=2
       - name: Renderer typecheck
         run: pnpm tc:web
       - uses: ./.github/actions/install-mobile-dependencies
@@ -46,6 +51,28 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: message-rail-proof
+          name: message-rail-proof-${{ runner.os }}
           path: message-rail-proof/
           retention-days: 7
+
+  repository-checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [lint, typecheck, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: node
+          node-version: '24'
+      - uses: ./.github/actions/install-mobile-dependencies
+      - name: Prepare workspace packages
+        run: pnpm run build:packages
+      - name: Run full repository command
+        run: pnpm run ${{ matrix.command }}
