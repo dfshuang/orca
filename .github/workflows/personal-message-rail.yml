@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: personal-message-rail-${{ github.ref }}
+  group: personal-message-rail-${{ github.ref }}-${{ github.event_name }}-${{ inputs.platform || 'all' }}
   cancel-in-progress: true
 
 env:
