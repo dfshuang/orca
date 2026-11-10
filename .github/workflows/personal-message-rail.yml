@@ -23,15 +23,27 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/install-node-dependencies
         with:
           native-runtime: none
           node-version: '24'
       - name: Lint and format
         run: |
-          pnpm exec oxlint src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.test.tsx
-          pnpm exec oxfmt --check src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.test.tsx src/renderer/src/i18n/locales/en.json src/renderer/src/i18n/locales/zh.json docs/site/content/docs/agents/native-chat.mdx
+          pnpm exec oxlint src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.test.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.fixture.tsx
+          pnpm exec oxfmt --check src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.test.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.fixture.tsx src/renderer/src/i18n/locales/en.json src/renderer/src/i18n/locales/zh.json docs/site/content/docs/agents/native-chat.mdx
       - name: Message rail tests
-        run: pnpm test src/renderer/src/components/native-chat/viewport/rail --maxWorkers=2
+        run: pnpm test src/renderer/src/components/native-chat/viewport/rail src/renderer/src/components/virtualized-list.test.tsx --maxWorkers=2
       - name: Renderer typecheck
         run: pnpm tc:web
+      - uses: ./.github/actions/install-mobile-dependencies
+      - name: Install headless browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Rendered directory navigation and long-history check
+        run: node config/scripts/component-fixtures/personal-message-rail.mjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: message-rail-proof
+          path: message-rail-proof/
+          retention-days: 7
