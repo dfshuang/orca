@@ -37,6 +37,8 @@ jobs:
       - name: Renderer typecheck
         run: pnpm tc:web
       - uses: ./.github/actions/install-mobile-dependencies
+      - name: Changed-code quality against the merged upstream base
+        run: pnpm check:code-quality:changed 8a10dd371c771f23546f025b6315920bf95fd025
       - name: Install headless browser
         run: pnpm exec playwright install --with-deps chromium
       - name: Rendered directory navigation and long-history check
