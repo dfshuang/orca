@@ -61,7 +61,32 @@ jobs:
           shasum -a 256 dist/*.zip > dist/SHA256SUMS.txt
       - name: Verify hidden application startup
         run: |
-          ORCA_USER_DATA_PATH="$RUNNER_TEMP/orca-personal-smoke" ORCA_APP_EXECUTABLE="$PWD/dist/mac-arm64/Orca.app/Contents/MacOS/Orca" dist/mac-arm64/Orca.app/Contents/Resources/bin/orca open --json
+          app="dist/mac-arm64/Orca.app/Contents/MacOS/Orca"
+          cli="dist/mac-arm64/Orca.app/Contents/Resources/bin/orca"
+          profile="$RUNNER_TEMP/orca-personal-smoke"
+          app_log="$RUNNER_TEMP/orca-personal-smoke.log"
+          status_json="$RUNNER_TEMP/orca-personal-status.json"
+
+          "$app" --user-data-dir="$profile" > "$app_log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+
+          for _ in {1..45}; do
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "Orca exited before its runtime became ready"
+              tail -n 200 "$app_log"
+              exit 1
+            fi
+            if ORCA_USER_DATA_PATH="$profile" "$cli" status --json > "$status_json" 2>/dev/null \
+              && node -e "const fs = require('node:fs'); const status = JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); if (!status.ok || !status.result?.runtime?.reachable || status.result?.app?.desktopWindowStatus !== 'available') process.exit(1)" "$status_json"; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "Orca did not expose a ready desktop runtime within 45 seconds"
+          tail -n 200 "$app_log"
+          exit 1
       - uses: actions/upload-artifact@v7
         with:
           name: orca-personal-macos-arm64
