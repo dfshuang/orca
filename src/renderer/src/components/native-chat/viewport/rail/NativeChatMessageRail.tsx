@@ -5,7 +5,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { VirtualizedList } from '@/components/virtualized-list'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/class-names'
 import { translate } from '@/i18n/i18n'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
@@ -218,7 +218,7 @@ export const NativeChatMessageRail = memo(function NativeChatMessageRail({
     >
       {expanded ? (
         <span className="text-xs font-medium">
-          {t('components.native-chat.railLabel', 'Your messages')}
+          {t('components.native-chat.railLabel', 'Chat history')}
         </span>
       ) : null}
       <Tooltip>
@@ -276,7 +276,7 @@ export const NativeChatMessageRail = memo(function NativeChatMessageRail({
             id={listId}
             role="toolbar"
             data-native-chat-rail
-            aria-label={t('components.native-chat.railLabel', 'Your messages')}
+            aria-label={t('components.native-chat.railLabel', 'Chat history')}
             aria-orientation="vertical"
             onBlur={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget)) {
