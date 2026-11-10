@@ -1,0 +1,37 @@
+name: Personal message rail checks
+
+on:
+  push:
+    branches: [ci/expand-chat-message-rail]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-message-rail-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORCA_BACKGROUND_LAUNCH: '1'
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-node-dependencies
+        with:
+          native-runtime: none
+          node-version: '24'
+      - name: Lint and format
+        run: |
+          pnpm exec oxlint src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.test.tsx
+          pnpm exec oxfmt --check src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.tsx src/renderer/src/components/native-chat/viewport/rail/NativeChatMessageRail.test.tsx src/renderer/src/i18n/locales/en.json src/renderer/src/i18n/locales/zh.json docs/site/content/docs/agents/native-chat.mdx
+      - name: Message rail tests
+        run: pnpm test src/renderer/src/components/native-chat/viewport/rail --maxWorkers=2
+      - name: Renderer typecheck
+        run: pnpm tc:web
