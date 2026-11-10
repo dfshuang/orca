@@ -1,0 +1,68 @@
+name: Personal macOS build
+
+on:
+  push:
+    branches: [build/personal-macos-arm64]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORCA_BACKGROUND_LAUNCH: '1'
+  NODE_OPTIONS: --max-old-space-size=4096
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v2
+        with:
+          install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          package-manager-cache: false
+      - name: Verify architecture
+        run: node -e "if (process.arch !== 'arm64') throw new Error('An Apple Silicon runner is required')"
+      - name: Install desktop dependencies
+        run: pnpm install --frozen-lockfile --cpu=current,x64,arm64
+      - uses: ./.github/actions/install-mobile-dependencies
+      - name: Identify personal build
+        run: |
+          node --input-type=module <<'NODE' >> "$GITHUB_ENV"
+          import { getLocalBuildIdentity } from './config/scripts/desktop-distribution/macos/build-mac-local.mjs'
+          const identity = getLocalBuildIdentity()
+          console.log(`ORCA_LOCAL_BUILD_VERSION=${identity.version}`)
+          console.log(`ORCA_BUILD_COMMIT=${identity.commit}`)
+          NODE
+      - name: Build application
+        run: |
+          pnpm run build:desktop
+          pnpm run build:native
+          pnpm run ensure:electron-runtime
+      - name: Package personal application
+        run: pnpm exec electron-builder --config config/electron-builder.personal.cjs --mac zip --arm64 --publish never
+      - name: Verify package
+        run: |
+          codesign --verify --deep --strict "dist/mac-arm64/Orca Personal.app"
+          node -e "const fs = require('node:fs'); const data = JSON.parse(fs.readFileSync('dist/mac-arm64/Orca Personal.app/Contents/Resources/orca-local-build.json')); if (data.appId !== 'com.dfshuang.orca.personal' || data.architecture !== 'arm64' || data.commit !== process.env.ORCA_BUILD_COMMIT) throw new Error('Package identity mismatch')"
+          shasum -a 256 dist/*.zip > dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: orca-personal-macos-arm64
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
