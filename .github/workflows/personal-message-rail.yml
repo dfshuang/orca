@@ -13,6 +13,9 @@ on:
       repository_checks:
         type: boolean
         default: true
+      component_checks:
+        type: boolean
+        default: true
       repository_commands:
         type: string
         default: '["lint","typecheck","build"]'
@@ -30,6 +33,7 @@ env:
 
 jobs:
   verify:
+    if: github.event_name != 'workflow_dispatch' || inputs.component_checks
     strategy:
       fail-fast: false
       matrix:
@@ -119,6 +123,8 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Fetch upstream release baselines for cross-version tests
+        run: git fetch --no-recurse-submodules https://github.com/stablyai/orca.git 'refs/tags/v*:refs/tags/v*'
       - uses: ./.github/actions/install-node-dependencies
         with:
           native-runtime: node
