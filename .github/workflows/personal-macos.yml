@@ -55,6 +55,8 @@ jobs:
       - name: Verify package
         run: |
           codesign --verify --deep --strict "dist/mac-arm64/Orca Personal.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' 'dist/mac-arm64/Orca Personal.app/Contents/Info.plist')" = Orca
+          "dist/mac-arm64/Orca Personal.app/Contents/Resources/bin/orca" --help > /dev/null
           node -e "const fs = require('node:fs'); const data = JSON.parse(fs.readFileSync('dist/mac-arm64/Orca Personal.app/Contents/Resources/orca-local-build.json')); if (data.appId !== 'com.dfshuang.orca.personal' || data.architecture !== 'arm64' || data.commit !== process.env.ORCA_BUILD_COMMIT) throw new Error('Package identity mismatch')"
           shasum -a 256 dist/*.zip > dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v7

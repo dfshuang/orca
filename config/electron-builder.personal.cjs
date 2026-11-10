@@ -9,6 +9,7 @@ module.exports = {
   ...base,
   appId,
   productName,
+  executableName: 'Orca',
   protocols: [{ name: productName, schemes: ['orca-personal'] }],
   extraMetadata: {
     name: 'orca-personal',
